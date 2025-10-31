@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌎 생태·환경 퀴즈게임</title>
+<style>
+  body {
+    margin: 0; font-family: 'Pretendard', sans-serif;
+    color: #fff; text-align: center; overflow: hidden;
+    transition: background 1s ease;
+  }
+  h1 { margin-top: 20px; }
+  #quiz-container {
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    height: 100vh; padding: 20px;
+  }
+  .question { font-size: 1.6em; margin-bottom: 25px; }
+  .options button {
+    display: block; margin: 8px auto; padding: 12px 25px;
+    background: rgba(255,255,255,0.15);
+    color: #fff; border: 2px solid rgba(255,255,255,0.5);
+    border-radius: 10px; font-size: 1em; cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .options button:hover { background: rgba(255,255,255,0.4); }
+  #progress { width: 80%; height: 15px; background: rgba(255,255,255,0.2);
+              border-radius: 8px; margin: 15px auto; overflow: hidden; }
+  #progress-bar { height: 100%; width: 0%; background: #00e6b8; transition: width 0.5s; }
+  #timer { font-size: 1.2em; margin: 10px; }
+  #hint, #next { margin: 10px; padding: 10px 18px; border: none;
+                 background: rgba(255,255,255,0.3); border-radius: 8px;
+                 color: #fff; cursor: pointer; }
+  #result { font-size: 1.5em; }
+  #explanation { font-size: 1em; margin-top: 10px; opacity: 0.9; }
+  #highscore { font-size: 1em; margin-top: 8px; opacity: 0.8; }
+  canvas { position: fixed; top:0; left:0; width:100%; height:100%; z-index:-1; }
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<div id="quiz-container">
+  <h1>🌳 생태·환경 퀴즈</h1>
+  <div id="timer"></div>
+  <div id="progress"><div id="progress-bar"></div></div>
+  <div class="question" id="question"></div>
+  <div class="options" id="options"></div>
+  <button id="hint">힌트보기</button>
+  <button id="next" style="display:none;">다음문제</button>
+  <div id="result"></div>
+  <div id="explanation"></div>
+  <div id="highscore"></div>
+</div>
+
+<script>
+const quizData = [
+  { q: "지구 온난화의 주요 원인으로 옳은 것은?", a: ["산소 증가", "이산화탄소 증가", "질소 감소", "황산 증가"], c: 1, h: "온실효과를 유발하는 기체", e:"이산화탄소가 증가하면 온실효과로 인해 지구 온도가 상승합니다." },
+  { q: "플라스틱 쓰레기가 가장 많이 축적되는 곳은?", a: ["사막", "산", "해양", "극지방"], c: 2, h: "물고기들도 먹는 곳", e:"플라스틱의 대부분은 해양으로 흘러 들어가 바다 생태계를 해칩니다." },
+  { q: "다음 중 재생 불가능한 에너지는?", a: ["태양열", "풍력", "석탄", "수력"], c: 2, h: "화석에서 나오는 에너지", e:"석탄은 한 번 사용하면 다시 만들 수 없는 재생 불가능 자원입니다." },
+  { q: "탄소중립이란?", a: ["탄소 배출을 완전히 없애는 것", "배출한 탄소를 상쇄하는 것", "탄소를 저장하는 것", "탄소세를 부과하는 것"], c: 1, h:"‘0’을 만드는 개념", e:"탄소중립은 배출된 탄소를 흡수·저감해 총량을 0으로 맞추는 것을 의미합니다." },
+  { q: "바다거북이 플라스틱 봉투를 먹는 이유는?", a:["냄새 때문", "색깔 때문", "해파리로 착각해서", "굶주림 때문"], c: 2, h:"해파리와 비슷한 모양", e:"투명한 플라스틱이 해파리처럼 보여서 먹이로 착각합니다." },
+  { q: "미세먼지의 주요 원인이 아닌 것은?", a:["자동차 배기가스", "공장 연기", "식물의 광합성", "석탄 연소"], c: 2, h:"산소를 만드는 행동", e:"식물의 광합성은 미세먼지를 만들지 않고 오히려 공기를 정화합니다." },
+  { q: "물 절약을 위해 가장 효과적인 방법은?", a:["짧은 샤워", "세탁기 자주 돌리기", "물을 계속 틀어놓기", "자동차 자주 세차"], c: 0, h:"욕실에서!", e:"짧은 샤워로 하루 수십 리터의 물을 절약할 수 있습니다." },
+  { q: "멸종 위기 동물 보호법의 목적은?", a:["동물을 전시하기 위함", "생태계 균형 유지", "사람의 연구 목적", "경제적 이용"], c: 1, h:"자연의 조화 유지", e:"멸종위기종을 보호함으로써 생태계의 건강한 균형을 유지합니다." },
+  { q: "지속 가능한 발전이란?", a:["미래세대 고려 없는 성장", "현재만을 위한 개발", "미래세대까지 고려한 발전", "환경보다 경제 우선"], c: 2, h:"미래 세대 포함", e:"지속 가능한 발전은 미래 세대가 필요를 충족할 수 있도록 하는 발전입니다." },
+  { q: "기후변화의 직접적 영향이 아닌 것은?", a:["해수면 상승", "폭염 증가", "공룡 부활", "기상이변"], c: 2, h:"비현실적인 선택지", e:"공룡 부활은 기후변화의 결과가 아닙니다 😅" }
+];
+
+const themes = ["forest","ocean","desert","snow"];
+let current = 0, score = 0, timer = 20, interval, used=[];
+let highscore = localStorage.getItem("ecoHigh") || 0;
+const qEl = document.getElementById("question");
+const oEl = document.getElementById("options");
+const tEl = document.getElementById("timer");
+const hEl = document.getElementById("hint");
+const nEl = document.getElementById("next");
+const rEl = document.getElementById("result");
+const eEl = document.getElementById("explanation");
+const pEl = document.getElementById("progress-bar");
+const hsEl = document.getElementById("highscore");
+const canvas = document.getElementById("bgCanvas");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener("resize", resizeCanvas); resizeCanvas();
+
+function drawBackground(type){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(type=="forest") forestAnim();
+  if(type=="ocean") oceanAnim();
+  if(type=="desert") desertAnim();
+  if(type=="snow") snowAnim();
+}
+
+function forestAnim(){
+  let leaves = Array(30).fill().map(()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*3+2}));
+  function loop(){
+    ctx.fillStyle="#013220";ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="rgba(0,255,100,0.5)";
+    leaves.forEach(l=>{ctx.beginPath();ctx.arc(l.x,l.y,l.r,0,Math.PI*2);ctx.fill();l.y+=0.5;if(l.y>canvas.height) l.y=0;});
+    requestAnimationFrame(loop);
+  } loop();
+}
+function oceanAnim(){
+  let waves = Array(50).fill().map(()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height}));
+  function loop(){
+    ctx.fillStyle="#001f3f";ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="rgba(0,150,255,0.3)";
+    waves.forEach(w=>{ctx.beginPath();ctx.arc(w.x,w.y,Math.random()*5+2,0,Math.PI*2);ctx.fill();w.y+=0.7;if(w.y>canvas.height) w.y=0;});
+    requestAnimationFrame(loop);
+  } loop();
+}
+function desertAnim(){
+  let dusts = Array(60).fill().map(()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height}));
+  function loop(){
+    ctx.fillStyle="#c2b280";ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="rgba(255,255,200,0.6)";
+    dusts.forEach(d=>{ctx.beginPath();ctx.arc(d.x,d.y,2,0,Math.PI*2);ctx.fill();d.x+=Math.sin(d.y/50)*0.5;d.y+=0.3;if(d.y>canvas.height) d.y=0;});
+    requestAnimationFrame(loop);
+  } loop();
+}
+function snowAnim(){
+  let snow = Array(50).fill().map(()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*3+1}));
+  function loop(){
+    ctx.fillStyle="#87CEFA";ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="white";
+    snow.forEach(s=>{ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();s.y+=0.6;if(s.y>canvas.height) s.y=0;});
+    requestAnimationFrame(loop);
+  } loop();
+}
+
+function startTimer(){
+  clearInterval(interval);
+  timer = 20;
+  interval = setInterval(()=>{
+    timer--;
+    tEl.innerText = "남은 시간: " + timer + "초";
+    if(timer<6) document.body.style.background = "rgba(200,0,0,0.2)";
+    else document.body.style.background = "transparent";
+    if(timer<=0){ clearInterval(interval); showExplanation(false); }
+  },1000);
+}
+
+function loadQuestion(){
+  rEl.innerText=""; eEl.innerText="";
+  if(current>=10){ endGame(); return; }
+  let idx;
+  do{ idx=Math.floor(Math.random()*quizData.length); }while(used.includes(idx));
+  used.push(idx);
+  const q = quizData[idx];
+  const theme = themes[Math.floor(Math.random()*themes.length)];
+  drawBackground(theme);
+  qEl.innerText = (current+1)+". "+q.q;
+  oEl.innerHTML = "";
+  q.a.forEach((opt,i)=>{
+    const btn=document.createElement("button");
+    btn.textContent=opt;
+    btn.onclick=()=>checkAnswer(i===q.c,q);
+    oEl.appendChild(btn);
+  });
+  pEl.style.width = ((current)/10*100)+"%";
+  hEl.onclick=()=>alert("힌트: "+q.h);
+  startTimer();
+}
+
+function checkAnswer(correct,q){
+  clearInterval(interval);
+  if(correct){ score+=10; rEl.innerText="✅ 정답!"; }
+  else { rEl.innerText="❌ 오답!"; }
+  showExplanation(correct,q);
+}
+
+function showExplanation(correct,q){
+  eEl.innerText = q?("📘 "+q.e):"시간초과!";
+  nEl.style.display="inline";
+  nEl.onclick=()=>{current++;nEl.style.display="none";loadQuestion();}
+}
+
+function endGame(){
+  clearInterval(interval);
+  pEl.style.width="100%";
+  document.body.style.background="rgba(0,0,0,0.7)";
+  let msg = score>=80?"🌿 훌륭해요! 환경 지킴이!":
+            score>=50?"🌱 괜찮아요, 조금 더 공부해볼까요?":
+            "🍂 다시 도전해보세요!";
+  if(score>highscore){ localStorage.setItem("ecoHigh",score); highscore=score; }
+  qEl.innerText = "퀴즈 종료! 총점: "+score+"점";
+  oEl.innerHTML = ""; hEl.style.display="none";
+  rEl.innerText = msg; eEl.innerText="";
+  hsEl.innerText="최고점수: "+highscore+"점";
+}
+
+loadQuestion();
+</script>
+</body>
+</html>
